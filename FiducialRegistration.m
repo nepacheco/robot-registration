@@ -18,8 +18,8 @@ fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
 checkRows = 4;
 checkCols = 5;
 checkPixSize = 35;
-checkX = 0:0.5:(checkCols-1)*0.5;
-checkY = (checkRows-1)*0.5:-0.5:0;
+checkX = 0.5:0.5:(checkCols)*0.5;
+checkY = (checkRows)*0.5:-0.5:0.5;
 [checkX,checkY] = meshgrid(checkX,checkY);
 checkX = reshape(checkX,[1,checkRows*checkCols]);
 checkY = reshape(checkY,[1,checkRows*checkCols]);
@@ -73,10 +73,10 @@ title("Checkerboard as seen in Camera")
 % Using the projective transform we manually created, find where the
 % checkerboard corners would be in a warped image and use MATLAB's
 % fitgeotrans to see what it produces for a homography matrix
-cornersAfterT = [70*(pix_W(1:2,:)' + [0.5 0.5]),ones(20,1)]*tform.T;
+cornersAfterT = [70*pix_W(1:2,:)',ones(20,1)]*tform.T;
 cornersAfterT = cornersAfterT./cornersAfterT(:,3);
 cornersAfterT = [cornersAfterT(:,1)+105,cornersAfterT(:,2)];
-tform2 = fitgeotrans(70*(pix_W(1:2,:)' + [0.5 0.5]),cornersAfterT,'projective');
+tform2 = fitgeotrans(70*pix_W(1:2,:)',cornersAfterT,'projective');
 [warpChecker2,RB2] = imwarp(checker,tform2);
 nexttile()
 imshow(warpChecker2)
@@ -86,7 +86,7 @@ title("Warped with fitted transform")
 % In the originally warped image, find the corners of the checkerboard
 % automatically and use those points for the fitgeotrans function. 
 pix_Cam = imagePoints'; % Checkerboard locations in pixels 
-tform3 = fitgeotrans(70*(pix_W(1:2,:)' + [0.5 0.5]),pix_Cam','projective');
+tform3 = fitgeotrans(70*pix_W(1:2,:)',pix_Cam','projective');
 [warpChecker3,RB3] = imwarp(checker,tform3);
 nexttile()
 imshow(warpChecker3)
@@ -149,14 +149,18 @@ fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",FLE2)
 fprintf("Experimentally we find <FLE^2> to be %0.3f\n",meanFLE2);
 fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'*sdW)
 
+%%
 figure(2)
 clf;
 hold on;
 FidW_Vec_Trans = T_R_W(1:3,1:3)*FidW_Vec + T_R_W(1:3,4);
-scatter3(FidR_Vec(1,:),FidR_Vec(2,:),FidR_Vec(3,:),'.','DisplayName',"Robot Fiducials")
-scatter3(FidW_Vec_Trans(1,:),FidW_Vec_Trans(2,:),FidW_Vec_Trans(3,:),'.','DisplayName',"World Fiducials")
+scatter3(FidR_Vec(1,:),FidR_Vec(2,:),FidR_Vec(3,:),'.','DisplayName',"Robot Fiducials",...
+    'MarkerFaceAlpha',0.75,'MarkerEdgeAlpha',0.75)
+scatter3(FidW_Vec_Trans(1,:),FidW_Vec_Trans(2,:),FidW_Vec_Trans(3,:),'.',...
+    'DisplayName',"World Fiducials",'MarkerFaceAlpha',0.75,'MarkerEdgeAlpha',0.75)
 plotTransforms(zeros(1,3),[1 zeros(1,3)],'FrameSize',10)
 plotTransforms(T_R_W(1:3,4)',rotm2quat(T_R_W(1:3,1:3)),'FrameSize',10)
+scatter3(pix_W(1,:),pix_W(2,:),pix_W(3,:),'k.','DisplayName',"Checkerboard Corners")
 hold off;
 grid on;
 xlabel("X Axis")

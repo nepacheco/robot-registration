@@ -10,8 +10,8 @@ rng(1)
 T_R_W = [rotz(120)*roty(50) [13 -20 3]'; 0 0 0 1]; % This transformation shows the proper location of the world in the robot frame
 Fid_W = [(rand(3,N) - 0.5)*40]; % These are the exact locations of the fiducials in the world frame;
 Fid_R = T_R_W(1:3,1:3)*Fid_W + T_R_W(1:3,4); % These are the exact locations of the fiducials in the robot frame
-[R,t] = point_register(Fid_W,Fid_R);
-FRE2 = calcFRE2(R,t,Fid_W,Fid_R);
+[R,t,FRE] = point_register(Fid_W,Fid_R);
+FRE2 = FRE^2;
 
 fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
 
@@ -26,8 +26,8 @@ sdW = 0.1;
 Fid_W_noise = Fid_W + normrnd(0,sdW,3,N);
 Fid_R_noise = Fid_R + normrnd(0,sdR,3,N);
 
-[R,t] = point_register(Fid_W_noise,Fid_R_noise);
-FRE2 = calcFRE2(R,t,Fid_W_noise,Fid_R_noise);
+[R,t,FRE] = point_register(Fid_W_noise,Fid_R_noise);
+FRE2 = FRE^2;
 
 fprintf("\nAssuming there is a standard deviation on the world fiducials\n" + ...
 "and robot fiducials of %0.2f and %0.2f respectively, we get\n" + ...
@@ -56,8 +56,8 @@ for i = 1:numSamples
     nFLE2 = nFLE2 + trace((Fid_W_noise - Fid_W)'*(Fid_W_noise-Fid_W))/N;
     meanFLE2 = (meanFLE2*(i-1) + nFLE2)/i;
 
-    [R,t] = point_register(Fid_W_noise,Fid_R_noise);
-    FRE2 = calcFRE2(R,t,Fid_W_noise,Fid_R_noise);
+    [R,t,FRE] = point_register(Fid_W_noise,Fid_R_noise);
+    FRE2 = FRE^2;
     
     meanFRE2 = (meanFRE2*(i-1) + FRE2)/i;
 end
@@ -88,22 +88,6 @@ title("Fiducial Registration")
 axis equal
 
 %% Functions
-function  [R,t] = point_register(X,Y)
-Xc = X - repmat(mean(X,2),1,size(X,2));
-Yc = Y - repmat(mean(Y,2),1,size(X,2));
-[U,~,V] = svd(Xc*Yc');
-R = V*diag([1, 1, det(V*U)])*U';
-t = mean(Y,2) - R*mean(X,2);
-end
-
-function FRE2 = calcFRE2(R,t,X,Y)
-% Calculates the Mean Squared Error between X transformed and Y 
-    FRE = R*X + t - Y;
-    se = sum(FRE.*FRE,1);
-    mse = mean(se,2);
-    % can also be calculated as trace(FRE'*FRE)/size(X,2)
-    FRE2 = mse;
-end
 
 function [Cov_TRE,Cov_FRE] = TRE(X,W,Cov_FLE,r)
 T = W(:,1,:);U = W(:,2,:);V = W(:,3,:);

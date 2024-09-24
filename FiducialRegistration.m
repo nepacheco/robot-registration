@@ -12,8 +12,87 @@ Fid_W = [(rand(3,N) - 0.5)*40]; % These are the exact locations of the fiducials
 Fid_R = T_R_W(1:3,1:3)*Fid_W + T_R_W(1:3,4); % These are the exact locations of the fiducials in the robot frame
 [R,t,FRE] = point_register(Fid_W,Fid_R);
 FRE2 = FRE^2;
-
 fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
+
+%% Camera setup
+checkRows = 4;
+checkCols = 5;
+checkPixSize = 35;
+checkX = 0:0.5:(checkCols-1)*0.5;
+checkY = (checkRows-1)*0.5:-0.5:0;
+[checkX,checkY] = meshgrid(checkX,checkY);
+checkX = reshape(checkX,[1,checkRows*checkCols]);
+checkY = reshape(checkY,[1,checkRows*checkCols]);
+pix_W = [checkX;checkY;zeros(1,checkRows*checkCols)]; % Checkerboard locations in the world frame
+figImages = figure(1);
+tiledlayout(figImages,'flow')
+% The perspective transform first rotates the image by 180 degrees, then
+% centeres it in the x axis and finally adds a tilt into the page by 45
+% degrees
+theta = deg2rad(0);
+A = [cos(theta), -sin(theta), 0.00;
+     sin(theta),  -cos(theta), 1/((checkRows+1)*checkPixSize)*(2/sqrt(2)-1); % the negative on the cosine is for a verticle flip
+     -(checkCols+1)*checkPixSize/2,  0, 1]*[1 0 0; 0 1 0; 0 (checkRows+1)*checkPixSize*sqrt(2)/2 1];
+tform = projective2d(A); % Because I am in R2021a I have to use projective2d(A)
+% which uses the post multiply convection [x y z]^T = [u v 1]^T * A
+
+% Creating the actual checkerboard image is very cumbersome with MATLAB's
+% checkerboard function
+checker = checkerboard(checkPixSize,round(checkRows/2)+1,round(checkCols/2)+1);
+% checker = checker((checkPixSize+1):end,1:end-checkPixSize);
+checker = checker(1:end-checkPixSize,1:end-checkPixSize);
+if mod(checkRows,2) == 1
+    checker = checker(1:end-checkPixSize,:);
+end
+if mod(checkCols,2) == 1
+    checker = checker(:,1:end-checkPixSize);
+end
+checker(1:checkPixSize,1:checkPixSize) = 0.5;
+nexttile()
+imshow(checker);
+set(gca,'YDir','normal')
+title("Checkerboard in World Frame")
+xlabel("X axis")
+ylabel("Y Axis")
+axis on
+% Warp the flat checkerboard to into the tilted position. Then detect the
+% corners of the checkerboard to define the "proper" location of the
+% checkerboard in the camera frame
+[warpChecker, RB] = imwarp(checker,tform);
+[imagePoints,boardSize] = detectCheckerboardPoints(warpChecker);
+warpCheckerMarked = warpChecker;
+for i = 1:checkCols
+    warpCheckerMarked = insertMarker(warpCheckerMarked,imagePoints((i-1)*checkRows+(1:checkRows),:)...
+        ,'o','Size',5);
+end
+nexttile()
+imshow(warpCheckerMarked)
+axis on
+title("Checkerboard as seen in Camera")
+
+% Using the projective transform we manually created, find where the
+% checkerboard corners would be in a warped image and use MATLAB's
+% fitgeotrans to see what it produces for a homography matrix
+cornersAfterT = [70*(pix_W(1:2,:)' + [0.5 0.5]),ones(20,1)]*tform.T;
+cornersAfterT = cornersAfterT./cornersAfterT(:,3);
+cornersAfterT = [cornersAfterT(:,1)+105,cornersAfterT(:,2)];
+tform2 = fitgeotrans(70*(pix_W(1:2,:)' + [0.5 0.5]),cornersAfterT,'projective');
+[warpChecker2,RB2] = imwarp(checker,tform2);
+nexttile()
+imshow(warpChecker2)
+axis on
+title("Warped with fitted transform")
+
+% In the originally warped image, find the corners of the checkerboard
+% automatically and use those points for the fitgeotrans function. 
+pix_Cam = imagePoints'; % Checkerboard locations in pixels 
+tform3 = fitgeotrans(70*(pix_W(1:2,:)' + [0.5 0.5]),pix_Cam','projective');
+[warpChecker3,RB3] = imwarp(checker,tform3);
+nexttile()
+imshow(warpChecker3)
+axis on
+title("Warped with fitted transform from found checkerboard points")
+
 
 %% Introduce FLE 
 % We will now introduce Fiducicial localization error in both the world
@@ -70,7 +149,7 @@ fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",FLE2)
 fprintf("Experimentally we find <FLE^2> to be %0.3f\n",meanFLE2);
 fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'*sdW)
 
-figure(1)
+figure(2)
 clf;
 hold on;
 FidW_Vec_Trans = T_R_W(1:3,1:3)*FidW_Vec + T_R_W(1:3,4);

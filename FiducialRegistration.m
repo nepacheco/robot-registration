@@ -21,17 +21,17 @@ fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
 % fiducial positions in the world and in the robot frames. 
 
 rng(1)
-stdR = 0.1;
-stdW = 0.1;
-Fid_W_noise = Fid_W + normrnd(0,stdW,3,N);
-Fid_R_noise = Fid_R + normrnd(0,stdR,3,N);
+sdR = 0.1;
+sdW = 0.1;
+Fid_W_noise = Fid_W + normrnd(0,sdW,3,N);
+Fid_R_noise = Fid_R + normrnd(0,sdR,3,N);
 
 [R,t] = point_register(Fid_W_noise,Fid_R_noise);
 FRE2 = calcFRE2(R,t,Fid_W_noise,Fid_R_noise);
 
 fprintf("\nAssuming there is a standard deviation on the world fiducials\n" + ...
 "and robot fiducials of %0.2f and %0.2f respectively, we get\n" + ...
-"an FRE^2 of %0.2f in a singular instance\n",stdW,stdR,FRE2);
+"an FRE^2 of %0.2f in a singular instance\n",sdW,sdR,FRE2);
 
 %% FLE population statistics
 % Once we begin to use randomness, we must create an ensemble of data from
@@ -45,10 +45,10 @@ meanFLE2 = 0;
 FidR_Vec = zeros(3,N*numSamples);
 FidW_Vec = zeros(3,N*numSamples);
 for i = 1:numSamples
-    stdR = 0.2; % x y and z directions
-    stdW = 0.5; % x y and z directions
-    Fid_W_noise = Fid_W + normrnd(0,stdW,3,N);
-    Fid_R_noise = Fid_R + normrnd(0,stdR,3,N);
+    sdR = 0.2; % x y and z directions
+    sdW = 0.5; % x y and z directions
+    Fid_W_noise = Fid_W + normrnd(0,sdW,3,N);
+    Fid_R_noise = Fid_R + normrnd(0,sdR,3,N);
     FidR_Vec(:,(i-1)*N+1:i*N) = Fid_R_noise;
     FidW_Vec(:,(i-1)*N+1:i*N) = Fid_W_noise;
     
@@ -63,12 +63,12 @@ for i = 1:numSamples
 end
 FLE2 = N/(N-2) * meanFRE2;
 
-fprintf("\nAfter %d samples, with a world STD = %0.2f and a robot STD = %0.2f\n" + ...
-    "the mean FRE^2 = %0.3f\n",numSamples,stdW,stdR,meanFRE2);
+fprintf("\nAfter %d samples, with a world SD = %0.2f and a robot SD = %0.2f\n" + ...
+    "the <FRE^2> = %0.3f\n",numSamples,sdW,sdR,meanFRE2);
 
-fprintf("\nThis means the FLE^2 should be around %0.3f\n",FLE2)
-fprintf("Numerically, we find FLE^2 to be %0.3f\n",meanFLE2);
-fprintf("Using our world and robot STD, FLE^2 = %0.3f\n",stdR^2*3 + stdW^2*3)
+fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",FLE2)
+fprintf("Experimentally we find <FLE^2> to be %0.3f\n",meanFLE2);
+fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR^2*3 + sdW^2*3)
 
 figure(1)
 clf;

@@ -45,10 +45,10 @@ meanFLE2 = 0;
 FidR_Vec = zeros(3,N*numSamples);
 FidW_Vec = zeros(3,N*numSamples);
 for i = 1:numSamples
-    sdR = 0.2; % x y and z directions
-    sdW = 0.5; % x y and z directions
-    Fid_W_noise = Fid_W + normrnd(0,sdW,3,N);
-    Fid_R_noise = Fid_R + normrnd(0,sdR,3,N);
+    sdR = [0.2;0.2;0.2]; % x y and z directions in the robot frame
+    sdW = [0.5;0.5;0.5]; % x y and z directions in the world frame
+    Fid_W_noise = Fid_W + normrnd(0,sdW*ones(1,N));
+    Fid_R_noise = Fid_R + normrnd(0,sdR*ones(1,N));
     FidR_Vec(:,(i-1)*N+1:i*N) = Fid_R_noise;
     FidW_Vec(:,(i-1)*N+1:i*N) = Fid_W_noise;
     
@@ -68,7 +68,7 @@ fprintf("\nAfter %d samples, with a world SD = %0.2f and a robot SD = %0.2f\n" +
 
 fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",FLE2)
 fprintf("Experimentally we find <FLE^2> to be %0.3f\n",meanFLE2);
-fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR^2*3 + sdW^2*3)
+fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'*sdW)
 
 figure(1)
 clf;

@@ -75,8 +75,8 @@ title("Checkerboard as seen in Camera")
 % fitgeotrans to see what it produces for a homography matrix
 cornersAfterT = [70*pix_W(1:2,:)',ones(20,1)]*tform.T;
 cornersAfterT = cornersAfterT./cornersAfterT(:,3);
-cornersAfterT = [cornersAfterT(:,1)+105,cornersAfterT(:,2)];
-tform2 = fitgeotrans(70*pix_W(1:2,:)',cornersAfterT,'projective');
+pix_Cam = [cornersAfterT(:,1)+105,cornersAfterT(:,2)]';
+tform2 = fitgeotrans(70*pix_W(1:2,:)',pix_Cam','projective');
 [warpChecker2,RB2] = imwarp(checker,tform2);
 nexttile()
 imshow(warpChecker2)
@@ -85,8 +85,8 @@ title("Warped with fitted transform")
 
 % In the originally warped image, find the corners of the checkerboard
 % automatically and use those points for the fitgeotrans function. 
-pix_Cam = imagePoints'; % Checkerboard locations in pixels 
-tform3 = fitgeotrans(70*pix_W(1:2,:)',pix_Cam','projective');
+
+tform3 = fitgeotrans(70*pix_W(1:2,:)',imagePoints,'projective');
 [warpChecker3,RB3] = imwarp(checker,tform3);
 nexttile()
 imshow(warpChecker3)
@@ -118,11 +118,14 @@ fprintf("\nAssuming there is a standard deviation on the world fiducials\n" + ..
 % from the previous section, we would see we get a different FRE each time.
 % Therefore, we must perform the calculation numerous times to get a mean
 % FRE. 
-numSamples = 1000;
-meanFRE2 = 0;
-meanFLE2 = 0;
+numSamples = 100000;
+msFREex = 0;
+msTREex = 0;
+msFLEex = 0;
+mFLE = 0;
 FidR_Vec = zeros(3,N*numSamples);
 FidW_Vec = zeros(3,N*numSamples);
+targetR_vec = zeros(3,numSamples);
 for i = 1:numSamples
     sdR = [0.2;0.2;0.2]; % x y and z directions in the robot frame
     sdW = [0.5;0.5;0.5]; % x y and z directions in the world frame
@@ -133,33 +136,64 @@ for i = 1:numSamples
     
     nFLE2 = trace((Fid_R_noise - Fid_R)'*(Fid_R_noise-Fid_R))/N;
     nFLE2 = nFLE2 + trace((Fid_W_noise - Fid_W)'*(Fid_W_noise-Fid_W))/N;
-    meanFLE2 = (meanFLE2*(i-1) + nFLE2)/i;
+    msFLEex = (msFLEex*(i-1) + nFLE2)/i;
+    mFLE = (mFLE*(i-1) + sqrt(nFLE2))/i;
 
     [R,t,FRE] = point_register(Fid_W_noise,Fid_R_noise);
     FRE2 = FRE^2;
     
-    meanFRE2 = (meanFRE2*(i-1) + FRE2)/i;
+    msFREex = (msFREex*(i-1) + FRE2)/i;
+    
+    target_W = [5,10,4]';
+    target_R = T_R_W*[target_W;1];
+    target_R_noise = R*target_W + t;
+    targetR_vec(:,i) = target_R_noise;
+    TRE2 = sum((target_R(1:3) - target_R_noise).^2);
+    msTREex = (msTREex*(i-1) + TRE2)/i;
+    
 end
-FLE2 = N/(N-2) * meanFRE2;
+msFLE = N/(N-2) * msFREex;
 
 fprintf("\nAfter %d samples, with a world SD = %0.2f and a robot SD = %0.2f\n" + ...
-    "the <FRE^2> = %0.3f\n",numSamples,sdW,sdR,meanFRE2);
+    "the <FRE^2> = %0.3f\n",numSamples,sdW,sdR,msFREex);
 
-fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",FLE2)
-fprintf("Experimentally we find <FLE^2> to be %0.3f\n",meanFLE2);
+fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",msFLE)
+fprintf("Experimentally we find <FLE^2> to be %0.3f\n",msFLEex);
 fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'*sdW)
 
+fprintf("\nTarget Located at (%0.2f,%0.2f,%0.2f)\n",target_R(1:3));
+fprintf("Experimentally, we find <TRE^2> = %0.3f\n",msTREex)
+fprintf("Theoretically, <TRE^2> = %0.3f\n",treapprox(Fid_R,target_R(1:3),sqrt(msFLEex))^2)
+
 %%
+
+
+
+%% Plotting Entire Setup
 figure(2)
 clf;
 hold on;
-FidW_Vec_Trans = T_R_W(1:3,1:3)*FidW_Vec + T_R_W(1:3,4);
-scatter3(FidR_Vec(1,:),FidR_Vec(2,:),FidR_Vec(3,:),'.','DisplayName',"Robot Fiducials",...
-    'MarkerFaceAlpha',0.75,'MarkerEdgeAlpha',0.75)
-scatter3(FidW_Vec_Trans(1,:),FidW_Vec_Trans(2,:),FidW_Vec_Trans(3,:),'.',...
-    'DisplayName',"World Fiducials",'MarkerFaceAlpha',0.75,'MarkerEdgeAlpha',0.75)
+T_W_R = inv(T_R_W); % location of robot in world's reference frame
+FidR_Vec_Trans = T_W_R(1:3,1:3)*FidR_Vec + T_W_R(1:3,4);
+% Fiducials Samples in Robot Frame
+scatter3(FidR_Vec_Trans(1,:),FidR_Vec_Trans(2,:),FidR_Vec_Trans(3,:),'o',...
+    'DisplayName',"Robot Fiducials",'MarkerEdgeAlpha',0.4)
+% Fiducical Samples in World Frame
+scatter3(FidW_Vec(1,:),FidW_Vec(2,:),FidW_Vec(3,:),'.',...
+    'DisplayName',"World Fiducials",'MarkerEdgeAlpha',0.4)
+% Target in world frame
+scatter3(target_W(1),target_W(2),target_W(3),100,'bx','DisplayName',"Target",...
+    'LineWidth',2)
+% scatter3(target_W(1),target_W(2),target_W(3),200,'rx','DisplayName',"Target",...
+%     'LineWidth',2,'MarkerEdgeAlpha',0.2)
+% Target samples after registration
+target_W_noise = T_W_R(1:3,1:3)*targetR_vec + T_W_R(1:3,4);
+scatter3(target_W_noise(1,:),target_W_noise(2,:),target_W_noise(3,:),'r.',...
+    'DisplayName',"Target Samples",'MarkerEdgeAlpha',1/(numSamples)^(1/4))
+
 plotTransforms(zeros(1,3),[1 zeros(1,3)],'FrameSize',10)
-plotTransforms(T_R_W(1:3,4)',rotm2quat(T_R_W(1:3,1:3)),'FrameSize',10)
+plotTransforms(T_W_R(1:3,4)',rotm2quat(T_W_R(1:3,1:3)),'FrameSize',10)
+% Plot Checkerboard
 scatter3(pix_W(1,:),pix_W(2,:),pix_W(3,:),'k.','DisplayName',"Checkerboard Corners")
 hold off;
 grid on;

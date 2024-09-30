@@ -6,9 +6,9 @@ clc;clear; close all;
 % localization error (FLE = 0)
 
 N = 7; % Number of fiducials 
-rng(1)
+rng(2)
 T_R_W = [rotz(120)*roty(50) [13 -20 3]'; 0 0 0 1]; % This transformation shows the proper location of the world in the robot frame
-Fid_W = [(rand(3,N) - 0.5)*40]; % These are the exact locations of the fiducials in the world frame;
+Fid_W = [(rand(3,N) - 0.5)*20]; % These are the exact locations of the fiducials in the world frame;
 Fid_R = T_R_W(1:3,1:3)*Fid_W + T_R_W(1:3,4); % These are the exact locations of the fiducials in the robot frame
 [R,t,FRE] = point_register(Fid_W,Fid_R);
 FRE2 = FRE^2;
@@ -144,6 +144,7 @@ for i = 1:numSamples
     
     msFREex = (msFREex*(i-1) + FRE2)/i;
     
+    % Choose a target in the world frame
     target_W = [5,10,4]';
     target_R = T_R_W*[target_W;1];
     target_R_noise = R*target_W + t;
@@ -154,14 +155,14 @@ for i = 1:numSamples
 end
 msFLE = N/(N-2) * msFREex;
 
-fprintf("\nAfter %d samples, with a world SD = %0.2f and a robot SD = %0.2f\n" + ...
+fprintf("\nAfter %d samples, with a world SD = [%0.2f,%0.2f,%0.2f] and a robot SD = [%0.2f,%0.2f,%0.2f]\n" + ...
     "the <FRE^2> = %0.3f\n",numSamples,sdW,sdR,msFREex);
 
 fprintf("\nUsing <FRE^2> to compute <FLE^2> gives us a value of %0.3f\n",msFLE)
 fprintf("Experimentally we find <FLE^2> to be %0.3f\n",msFLEex);
 fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'*sdW)
 
-fprintf("\nTarget Located at (%0.2f,%0.2f,%0.2f)\n",target_R(1:3));
+fprintf("\nTarget Located at (%0.2f,%0.2f,%0.2f)\n",target_W(1:3));
 fprintf("Experimentally, we find <TRE^2> = %0.3f\n",msTREex)
 fprintf("Theoretically, <TRE^2> = %0.3f\n",treapprox(Fid_R,target_R(1:3),sqrt(msFLEex))^2)
 
@@ -170,28 +171,36 @@ fprintf("Theoretically, <TRE^2> = %0.3f\n",treapprox(Fid_R,target_R(1:3),sqrt(ms
 
 
 %% Plotting Entire Setup
+numPlotSamples = min(100,numSamples);
+transparency = 0.2;
 figure(2)
 clf;
 hold on;
 T_W_R = inv(T_R_W); % location of robot in world's reference frame
 FidR_Vec_Trans = T_W_R(1:3,1:3)*FidR_Vec + T_W_R(1:3,4);
 % Fiducials Samples in Robot Frame
-scatter3(FidR_Vec_Trans(1,:),FidR_Vec_Trans(2,:),FidR_Vec_Trans(3,:),'o',...
-    'DisplayName',"Robot Fiducials",'MarkerEdgeAlpha',0.4)
+s2 = scatter3(FidR_Vec_Trans(1,1:numPlotSamples*N),...
+    FidR_Vec_Trans(2,1:numPlotSamples*N),FidR_Vec_Trans(3,1:numPlotSamples*N),...
+    15,'ro','filled',...
+    'DisplayName',"Robot Fiducials",'MarkerEdgeAlpha',transparency,...
+    'MarkerFaceAlpha',transparency);
 % Fiducical Samples in World Frame
-scatter3(FidW_Vec(1,:),FidW_Vec(2,:),FidW_Vec(3,:),'.',...
-    'DisplayName',"World Fiducials",'MarkerEdgeAlpha',0.4)
+s3 = scatter3(FidW_Vec(1,1:numPlotSamples*N),FidW_Vec(2,1:numPlotSamples*N),...
+    FidW_Vec(3,1:numPlotSamples*N),15,'bo','filled',...
+    'DisplayName',"World Fiducials",'MarkerEdgeAlpha',transparency,...
+    'MarkerFaceAlpha',transparency);
 % Target in world frame
-scatter3(target_W(1),target_W(2),target_W(3),100,'bx','DisplayName',"Target",...
-    'LineWidth',2)
-% scatter3(target_W(1),target_W(2),target_W(3),200,'rx','DisplayName',"Target",...
-%     'LineWidth',2,'MarkerEdgeAlpha',0.2)
+s4 = scatter3(target_W(1),target_W(2),target_W(3),100,'bx','DisplayName',"Target",...
+    'LineWidth',2,'MarkerEdgeAlpha',1.0);
+
 % Target samples after registration
 target_W_noise = T_W_R(1:3,1:3)*targetR_vec + T_W_R(1:3,4);
-scatter3(target_W_noise(1,:),target_W_noise(2,:),target_W_noise(3,:),'r.',...
-    'DisplayName',"Target Samples",'MarkerEdgeAlpha',1/(numSamples)^(1/4))
+s5 = scatter3(target_W_noise(1,1:numPlotSamples),target_W_noise(2,1:numPlotSamples),...
+    target_W_noise(3,1:numPlotSamples),15,'ro','filled',...
+    'DisplayName',"Target Samples",'MarkerEdgeAlpha',transparency,...
+    'MarkerFaceAlpha',transparency);
 
-plotTransforms(zeros(1,3),[1 zeros(1,3)],'FrameSize',10)
+tf = plotTransforms(zeros(1,3),[1 zeros(1,3)],'FrameSize',10);
 plotTransforms(T_W_R(1:3,4)',rotm2quat(T_W_R(1:3,1:3)),'FrameSize',10)
 % Plot Checkerboard
 scatter3(pix_W(1,:),pix_W(2,:),pix_W(3,:),'k.','DisplayName',"Checkerboard Corners")
@@ -203,6 +212,7 @@ zlabel("Z Axis")
 legend('Location','best')
 title("Fiducial Registration")
 axis equal
+set(gca,'FontSize',18)
 
 %% Functions
 

@@ -30,9 +30,14 @@ tiledlayout(figImages,'flow')
 % centeres it in the x axis and finally adds a tilt into the page by 45
 % degrees
 theta = deg2rad(0);
+
+% To build the homography matrix, we multiple two matrices.
+%   1. First flip about the x axis, center the image on the y axis, and
+%       tilt into the z axis
+%   2. Shift the frame so that x and y axis start at corner of the image. 
 A = [cos(theta), -sin(theta), 0.00;
      sin(theta),  -cos(theta), 1/((checkRows+1)*checkPixSize)*(2/sqrt(2)-1); % the negative on the cosine is for a verticle flip
-     -(checkCols+1)*checkPixSize/2,  0, 1]*[1 0 0; 0 1 0; 0 (checkRows+1)*checkPixSize*sqrt(2)/2 1];
+     -(checkCols+1)*checkPixSize/2,  0, 1]*[1 0 0; 0 1 0; (checkCols+1)*checkPixSize/2, (checkRows+1)*checkPixSize*sqrt(2)/2 1];
 tform = projective2d(A); % Because I am in R2021a I have to use projective2d(A)
 % which uses the post multiply convection [x y z]^T = [u v 1]^T * A
 
@@ -75,7 +80,7 @@ title("Checkerboard as seen in Camera")
 % fitgeotrans to see what it produces for a homography matrix
 cornersAfterT = [checkPixSize*2*pix_W(1:2,:)',ones(checkRows*checkCols,1)]*tform.T;
 cornersAfterT = cornersAfterT./cornersAfterT(:,3);
-pix_Cam = [cornersAfterT(:,1)+105,cornersAfterT(:,2)]';
+pix_Cam = [cornersAfterT(:,1),cornersAfterT(:,2)]';
 tform2 = fitgeotrans(checkPixSize*2*pix_W(1:2,:)',pix_Cam','projective');
 [warpChecker2,RB2] = imwarp(checker,tform2);
 nexttile()
@@ -86,7 +91,7 @@ title("Warped with fitted transform")
 % In the originally warped image, find the corners of the checkerboard
 % automatically and use those points for the fitgeotrans function. 
 
-tform3 = fitgeotrans(70*pix_W(1:2,:)',imagePoints,'projective');
+tform3 = fitgeotrans(checkPixSize*2*pix_W(1:2,:)',imagePoints,'projective');
 [warpChecker3,RB3] = imwarp(checker,tform3);
 nexttile()
 imshow(warpChecker3)
@@ -126,8 +131,8 @@ mFLE = 0;
 FidR_Vec = zeros(3,N*numSamples);
 FidW_Vec = zeros(3,N*numSamples);
 targetR_vec = zeros(3,numSamples);
-sdR = [0.2;0.2;0.2]; % x y and z directions in the robot frame
-sdW = [0.5;0.5;0.5]; % x y and z directions in the world frame
+sdR = [0.2;0.2;0.2]; % S.D. x y and z directions in the robot frame
+sdW = [0.5;0.5;0.5]; % S.D. x y and z directions in the world frame
 for i = 1:numSamples
     % Generate the fiducial in the world after FLE is applied
     Fid_W_noise = Fid_W + normrnd(0,sdW*ones(1,N));

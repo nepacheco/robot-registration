@@ -64,40 +64,40 @@ axis on
 % corners of the checkerboard to define the "proper" location of the
 % checkerboard in the camera frame
 [warpChecker, RB] = imwarp(checker,tform);
-[imagePoints,boardSize] = detectCheckerboardPoints(warpChecker);
-warpCheckerMarked = warpChecker;
-for i = 1:checkCols
-    warpCheckerMarked = insertMarker(warpCheckerMarked,imagePoints((i-1)*checkRows+(1:checkRows),:)...
-        ,'o','Size',5);
-end
 nexttile()
-imshow(warpCheckerMarked)
+imshow(warpChecker)
 axis on
-title("Checkerboard as seen in Camera")
+title("Perfect Checkerboard as seen in Camera")
 
-% Using the projective transform we manually created, find where the
-% checkerboard corners would be in a warped image and use MATLAB's
-% fitgeotrans to see what it produces for a homography matrix
-cornersAfterT = [checkPixSize*2*pix_W(1:2,:)',ones(checkRows*checkCols,1)]*tform.T;
-cornersAfterT = cornersAfterT./cornersAfterT(:,3);
-pix_Cam = [cornersAfterT(:,1),cornersAfterT(:,2)]';
-tform2 = fitgeotrans(checkPixSize*2*pix_W(1:2,:)',pix_Cam','projective');
-[warpChecker2,RB2] = imwarp(checker,tform2);
+
+% Apply noise and filtering to the perfect camera image and then identify
+% the corners of the checkerboard
+noiseWarpChecker = imnoise(warpChecker,"gaussian",0,0.1); % Add Gaussian noise
+noiseWarpChecker = imgaussfilt(noiseWarpChecker,2); % Apply a blurring to the image
+[imagePoints,boardSize] = detectCheckerboardPoints(noiseWarpChecker);
+markedChecker = insertMarker(noiseWarpChecker, imagePoints, 'o', 'MarkerColor', 'red', 'Size', 2);
 nexttile()
-imshow(warpChecker2)
+imshow(markedChecker)
 axis on
-title("Warped with fitted transform")
+title("Noise added to Camera Image")
 
-% In the originally warped image, find the corners of the checkerboard
-% automatically and use those points for the fitgeotrans function. 
-
-tform3 = fitgeotrans(checkPixSize*2*pix_W(1:2,:)',imagePoints,'projective');
-[warpChecker3,RB3] = imwarp(checker,tform3);
+% Apply a projective transform between the identified checkerboard points
+% and the location of those points in the world and 'dewarp' the image
+tform3 = fitgeotrans(imagePoints,checkPixSize*2*pix_W(1:2,:)','projective');
+[warpChecker3,RB3] = imwarp(noiseWarpChecker,tform3);
 nexttile()
 imshow(warpChecker3)
 axis on
+axis equal
 title("Warped with fitted transform from found checkerboard points")
 
+% Calculate the pixel reprojection error based on the transform from the
+% noisy image
+warpedWorld = [imagePoints,ones(checkRows*checkCols,1)]*tform3.T;
+warpedWorld = warpedWorld./warpedWorld(:,3);
+error = warpedWorld-[checkPixSize*2*pix_W(1:2,:)',ones(checkRows*checkCols,1)];
+mse = mean(sum(error.*error,2));
+fprintf("\nPixel Reprojection Error: %0.3f pixels\n",sqrt(mse));
 
 %% Introduce FLE 
 % We will now introduce Fiducicial localization error in both the world
@@ -154,7 +154,7 @@ for i = 1:numSamples
     msFREex = (msFREex*(i-1) + FRE2)/i;
     
     % Choose a target in the world frame
-    target_W = [5,10,4]';
+    target_W = [5,4,10]';
     % Get the exact location of target in the robot frame
     target_R = T_R_W*[target_W;1];
     % Get the location of the target in the world frame after applying the
@@ -166,6 +166,8 @@ for i = 1:numSamples
     msTREex = (msTREex*(i-1) + TRE2)/i;
 
     % Get the world location in pixels
+    target_Cam = [checkPixSize*2*target_W(1:2)',1]*tform.T; % this is where the pixel should be
+    target_Cam_noise = [checkPixSize*2*target_W(1:2)',1]*inv(tform3.T);
     
 end
 msFLE = N/(N-2) * msFREex;
@@ -180,9 +182,6 @@ fprintf("Theoretically the <FLE^2> = %0.3f based on our noise\n",sdR'*sdR + sdW'
 fprintf("\nTarget Located at (%0.2f,%0.2f,%0.2f)\n",target_W(1:3));
 fprintf("Experimentally, we find <TRE^2> = %0.3f\n",msTREex)
 fprintf("Theoretically, <TRE^2> = %0.3f\n",treapprox(Fid_R,target_R(1:3),sqrt(msFLEex))^2)
-
-%%
-
 
 
 %% Plotting Entire Setup

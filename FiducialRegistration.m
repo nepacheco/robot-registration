@@ -17,9 +17,9 @@ fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
 %% Camera setup
 checkRows = 4;
 checkCols = 5;
-checkPixSize = 35;
-checkX = 0.5:0.5:(checkCols)*0.5;
-checkY = (checkRows)*0.5:-0.5:0.5;
+checkPixSize = 35; % [pixels]
+checkX = 0.5:0.5:(checkCols)*0.5; % [cm]
+checkY = (checkRows)*0.5:-0.5:0.5; % [cm]
 [checkX,checkY] = meshgrid(checkX,checkY);
 checkX = reshape(checkX,[1,checkRows*checkCols]);
 checkY = reshape(checkY,[1,checkRows*checkCols]);
@@ -126,19 +126,23 @@ mFLE = 0;
 FidR_Vec = zeros(3,N*numSamples);
 FidW_Vec = zeros(3,N*numSamples);
 targetR_vec = zeros(3,numSamples);
+sdR = [0.2;0.2;0.2]; % x y and z directions in the robot frame
+sdW = [0.5;0.5;0.5]; % x y and z directions in the world frame
 for i = 1:numSamples
-    sdR = [0.2;0.2;0.2]; % x y and z directions in the robot frame
-    sdW = [0.5;0.5;0.5]; % x y and z directions in the world frame
+    % Generate the fiducial in the world after FLE is applied
     Fid_W_noise = Fid_W + normrnd(0,sdW*ones(1,N));
+    % Generate fiducial location in robot frame after FLE is applied
     Fid_R_noise = Fid_R + normrnd(0,sdR*ones(1,N));
     FidR_Vec(:,(i-1)*N+1:i*N) = Fid_R_noise;
     FidW_Vec(:,(i-1)*N+1:i*N) = Fid_W_noise;
     
+    % Calculate an experimental FLE
     nFLE2 = trace((Fid_R_noise - Fid_R)'*(Fid_R_noise-Fid_R))/N;
     nFLE2 = nFLE2 + trace((Fid_W_noise - Fid_W)'*(Fid_W_noise-Fid_W))/N;
     msFLEex = (msFLEex*(i-1) + nFLE2)/i;
     mFLE = (mFLE*(i-1) + sqrt(nFLE2))/i;
 
+    % Perform rigid registration between fiducial pairs
     [R,t,FRE] = point_register(Fid_W_noise,Fid_R_noise);
     FRE2 = FRE^2;
     
@@ -146,11 +150,17 @@ for i = 1:numSamples
     
     % Choose a target in the world frame
     target_W = [5,10,4]';
+    % Get the exact location of target in the robot frame
     target_R = T_R_W*[target_W;1];
+    % Get the location of the target in the world frame after applying the
+    % transform from the point registration
     target_R_noise = R*target_W + t;
     targetR_vec(:,i) = target_R_noise;
+    % Calculate the TRE^2
     TRE2 = sum((target_R(1:3) - target_R_noise).^2);
     msTREex = (msTREex*(i-1) + TRE2)/i;
+
+    % Get the world location in pixels
     
 end
 msFLE = N/(N-2) * msFREex;
@@ -206,9 +216,9 @@ plotTransforms(T_W_R(1:3,4)',rotm2quat(T_W_R(1:3,1:3)),'FrameSize',10)
 scatter3(pix_W(1,:),pix_W(2,:),pix_W(3,:),'k.','DisplayName',"Checkerboard Corners")
 hold off;
 grid on;
-xlabel("X Axis")
-ylabel("Y Axis")
-zlabel("Z Axis")
+xlabel("X Axis (cm)")
+ylabel("Y Axis (cm)")
+zlabel("Z Axis (cm)")
 legend('Location','best')
 title("Fiducial Registration")
 axis equal

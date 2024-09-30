@@ -15,8 +15,8 @@ FRE2 = FRE^2;
 fprintf("Assuming the FLE = 0, we see that the resulting FRE2 = %0.4f\n",FRE2);
 
 %% Camera setup
-checkRows = 4;
-checkCols = 5;
+checkRows =8;
+checkCols = 11;
 checkPixSize = 35; % [pixels]
 checkX = 0.5:0.5:(checkCols)*0.5; % [cm]
 checkY = (checkRows)*0.5:-0.5:0.5; % [cm]
@@ -73,10 +73,10 @@ title("Checkerboard as seen in Camera")
 % Using the projective transform we manually created, find where the
 % checkerboard corners would be in a warped image and use MATLAB's
 % fitgeotrans to see what it produces for a homography matrix
-cornersAfterT = [70*pix_W(1:2,:)',ones(20,1)]*tform.T;
+cornersAfterT = [checkPixSize*2*pix_W(1:2,:)',ones(checkRows*checkCols,1)]*tform.T;
 cornersAfterT = cornersAfterT./cornersAfterT(:,3);
 pix_Cam = [cornersAfterT(:,1)+105,cornersAfterT(:,2)]';
-tform2 = fitgeotrans(70*pix_W(1:2,:)',pix_Cam','projective');
+tform2 = fitgeotrans(checkPixSize*2*pix_W(1:2,:)',pix_Cam','projective');
 [warpChecker2,RB2] = imwarp(checker,tform2);
 nexttile()
 imshow(warpChecker2)

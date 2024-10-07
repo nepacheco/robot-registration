@@ -23,7 +23,13 @@ checkY = (checkRows)*0.5:-0.5:0.5; % [cm]
 [checkX,checkY] = meshgrid(checkX,checkY);
 checkX = reshape(checkX,[1,checkRows*checkCols]);
 checkY = reshape(checkY,[1,checkRows*checkCols]);
-pix_W = [checkX;checkY;zeros(1,checkRows*checkCols)]; % Checkerboard locations in the world frame
+
+% Assumed checkerboard locations in the world frame
+pix_W_assumed = [checkX;checkY;zeros(1,checkRows*checkCols)]; 
+
+ % Actual location of the checkerboard in the world frame
+pix_W = rotz(0)*roty(0)*rotz(0)*pix_W_assumed + [0;0;0];
+
 figImages = figure(1);
 tiledlayout(figImages,'flow')
 % The perspective transform first rotates the image by 180 degrees, then
@@ -83,7 +89,7 @@ title("Noise added to Camera Image")
 
 % Apply a projective transform between the identified checkerboard points
 % and the location of those points in the world and 'dewarp' the image
-tform3 = fitgeotrans(imagePoints,checkPixSize*2*pix_W(1:2,:)','projective');
+tform3 = fitgeotrans(imagePoints,checkPixSize*2*pix_W_assumed(1:2,:)','projective');
 [warpChecker3,RB3] = imwarp(noiseWarpChecker,tform3);
 nexttile()
 imshow(warpChecker3)
@@ -95,7 +101,7 @@ title("Warped with fitted transform from found checkerboard points")
 % noisy image
 warpedWorld = [imagePoints,ones(checkRows*checkCols,1)]*tform3.T;
 warpedWorld = warpedWorld./warpedWorld(:,3);
-error = warpedWorld-[checkPixSize*2*pix_W(1:2,:)',ones(checkRows*checkCols,1)];
+error = warpedWorld-[checkPixSize*2*pix_W_assumed(1:2,:)',ones(checkRows*checkCols,1)];
 mse = mean(sum(error.*error,2));
 fprintf("\nPixel Reprojection Error: %0.3f pixels\n",sqrt(mse));
 
@@ -216,8 +222,10 @@ s5 = scatter3(target_W_noise(1,1:numPlotSamples),target_W_noise(2,1:numPlotSampl
 
 tf = plotTransforms(zeros(1,3),[1 zeros(1,3)],'FrameSize',10);
 plotTransforms(T_W_R(1:3,4)',rotm2quat(T_W_R(1:3,1:3)),'FrameSize',10)
-% Plot Checkerboard
+% Plot Checkerboard in actual world frame
 scatter3(pix_W(1,:),pix_W(2,:),pix_W(3,:),'k.','DisplayName',"Checkerboard Corners")
+% Plot the Location of the assumed checkerboard
+scatter3(pix_W_assumed(1,:),pix_W_assumed(2,:),pix_W_assumed(3,:),'r.','DisplayName',"Assumed Checkerboard Corners")
 hold off;
 grid on;
 xlabel("X Axis (cm)")
